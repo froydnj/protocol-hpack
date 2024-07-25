@@ -100,7 +100,7 @@ module Protocol
 			def read_header
 				pattern = peek_byte
 
-				header = {}
+				header = [nil, nil, nil]
 
 				type = nil
 
@@ -133,51 +133,51 @@ module Protocol
 
 				case (pattern & MASK_SHIFT_4)
 				when 0x00
-					header[:type] = :no_index
+					header[0] = :no_index
 					type = NO_INDEX_TYPE
 				when 0x10
-					header[:type] = :never_indexed
+					header[0] = :never_indexed
 					type = NEVER_INDEXED_TYPE
 				# checking if (pattern >> 5) << 5 == 0x20
 				# Since we cleared bottom 4 bits, the 5th
 				# bit can be either 0 or 1, so check both
 				# cases.
 				when 0x20, 0x30
-					header[:type] = :change_table_size
+					header[0] = :change_table_size
 					type = CHANGE_TABLE_SIZE_TYPE
 				# checking if (pattern >> 6) << 6 == 0x40
 				# Same logic as above, but now over the 4
 				# possible combinations of 2 bits (5th, 6th)
 				when 0x40, 0x50, 0x60, 0x70
-					header[:type] = :incremental
+					header[0] = :incremental
 					type = INCREMENTAL_TYPE
 				# checking if (pattern >> 7) << 7 == 0x80
 				when 0x80, 0x90, 0xa0, 0xb0, 0xc0, 0xd0, 0xe0, 0xf0
-					header[:type] = :indexed
+					header[0] = :indexed
 					type = INDEXED_TYPE
 				end
 
 				header_name = read_integer(type[:prefix])
 
-				case header[:type]
+				case header[0]
 				when :indexed
 					raise CompressionError if header_name.zero?
-					header[:name] = header_name - 1
+					header[1] = header_name - 1
 				when :change_table_size
-					header[:name] = header_name
-					header[:value] = header_name
+					header[1] = header_name
+					header[2] = header_name
 					
-					if @table_size_limit and header[:value] > @table_size_limit
-						raise CompressionError, "Table size #{header[:value]} exceeds limit #{@table_size_limit}!"
+					if @table_size_limit and header[2] > @table_size_limit
+						raise CompressionError, "Table size #{header[2]} exceeds limit #{@table_size_limit}!"
 					end
 				else
 					if header_name.zero?
-						header[:name] = read_string
+						header[1] = read_string
 					else
-						header[:name] = header_name - 1
+						header[1] = header_name - 1
 					end
 					
-					header[:value] = read_string
+					header[2] = read_string
 				end
 
 				return header
@@ -191,12 +191,12 @@ module Protocol
 				while !end?
 					command = read_header
 					
-					if pair = @context.decode(command)
+					if pair = @context.decode(*command)
 						list << pair
 					end
 				end
 				
-				if command and command[:type] == :change_table_size
+				if command and command[0] == :change_table_size
 					raise CompressionError, "Trailing table size update!"
 				end
 				

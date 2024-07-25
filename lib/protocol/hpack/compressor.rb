@@ -143,25 +143,25 @@ module Protocol
 			# @param h [Hash] header command
 			# @param buffer [String]
 			# @return [Buffer]
-			def write_header(command)
-				representation = HEADER_REPRESENTATION[command[:type]]
+			def write_header(type, name = nil, value = nil)
+				representation = HEADER_REPRESENTATION.fetch(type)
 				
 				first = @buffer.bytesize
 				
-				case command[:type]
+				case type
 				when :indexed
-					write_integer(command[:name] + 1, representation[:prefix])
+					write_integer(name + 1, representation[:prefix])
 				when :change_table_size
-					write_integer(command[:value], representation[:prefix])
+					write_integer(value, representation[:prefix])
 				else
-					if command[:name].is_a? Integer
-						write_integer(command[:name] + 1, representation[:prefix])
+					if name.is_a? Integer
+						write_integer(name + 1, representation[:prefix])
 					else
 						write_integer(0, representation[:prefix])
-						write_string(command[:name])
+						write_string(name)
 					end
 					
-					write_string(command[:value])
+					write_string(value)
 				end
 
 				# set header representation pattern on first byte
@@ -176,13 +176,13 @@ module Protocol
 				if table_size and table_size != @context.table_size
 					command = @context.change_table_size(table_size)
 					
-					write_header(command)
+					write_header(*command)
 				end
 				
 				commands = @context.encode(headers)
 				
 				commands.each do |command|
-					write_header(command)
+					write_header(*command)
 				end
 				
 				return @buffer

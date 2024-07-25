@@ -15,8 +15,9 @@ RSpec.describe Protocol::HPACK::Decompressor do
 		
 		it 'should reject table size update if exceed limit' do
 			expect(subject.table_size_limit).to be == 256
-			
-			compressor.write_header({type: :change_table_size, value: 512})
+
+                        header = [:change_table_size, nil, 512]
+			compressor.write_header(*header)
 			
 			expect do
 				subject.read_header
@@ -56,7 +57,8 @@ RSpec.describe Protocol::HPACK::Decompressor do
 		subject {described_class.new(buffer, table_size_limit: 256)}
 		
 		it "should raise error" do
-			compressor.write_header({type: :change_table_size, value: 256})
+			header = [:change_table_size, nil, 256]
+			compressor.write_header(*header)
 			
 			expect do
 				subject.decode

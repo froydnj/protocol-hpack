@@ -151,12 +151,12 @@ module Protocol
 			#
 			# @param command [Hash] {type:, name:, value:, index:}
 			# @return [Array] +[name, value]+ header field that is added to the decoded header list
-			def decode(command)
+			def decode(type, name = nil, value = nil)
 				emit = nil
 
-				case command[:type]
+				case type
 				when :change_table_size
-					self.table_size = command[:value]
+					self.table_size = value
 
 				when :indexed
 					# Indexed Representation
@@ -164,7 +164,7 @@ module Protocol
 					# o  The header field corresponding to the referenced entry in either
 					# the static table or dynamic table is added to the decoded header
 					# list.
-					idx = command[:name]
+					idx = name
 
 					k, v = dereference(idx)
 					emit = [k, v]
@@ -179,21 +179,20 @@ module Protocol
 					# o  The header field is added to the decoded header list.
 					# o  The header field is inserted at the beginning of the dynamic table.
 
-					if command[:name].is_a? Integer
-						k, v = dereference(command[:name])
+					if name.is_a? Integer
+						k, v = dereference(name)
 
 						command = command.dup
-						command[:index] ||= command[:name]
-						command[:value] ||= v
-						command[:name] = k
+						value ||= v
+						name = k
 					end
 
-					emit = [command[:name], command[:value]]
+					emit = [name, value]
 
-					add_to_table(emit) if command[:type] == :incremental
+					add_to_table(emit) if type == :incremental
 
 				else
-					raise CompressionError, "Invalid type: #{command[:type]}"
+					raise CompressionError, "Invalid type: #{type}"
 				end
 
 				return emit
@@ -214,10 +213,10 @@ module Protocol
 				
 				headers.each do |field, value|
 					command = add_command(field, value)
-					command[:type] = :no_index if no_index && command[:type] == :incremental
+					command[0] = :no_index if no_index && command[0] == :incremental
 					commands << command
 					
-					decode(command)
+					decode(*command)
 				end
 				
 				return commands
@@ -261,11 +260,14 @@ module Protocol
 				end
 
 				if exact
-					{name: exact, type: :indexed}
+          [:indexed, exact]
+					#{name: exact, type: :indexed}
 				elsif name_only
-					{name: name_only, value: header.last, type: :incremental}
+          [:incremental, name_only, header.last]
+					#{name: name_only, value: header.last, type: :incremental}
 				else
-					{name: header.first, value: header.last, type: :incremental}
+          [:incremental, header.first, header.last]
+					#{name: header.first, value: header.last, type: :incremental}
 				end
 			end
 
@@ -280,7 +282,8 @@ module Protocol
 				self.table_size = size
 				
 				# The command to resize the table:
-				return {type: :change_table_size, value: size}
+				return [:change_table_size, nil, size]
+        #{type: :change_table_size, value: size}
 			end
 			
 			# Returns current table size in octets

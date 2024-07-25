@@ -36,7 +36,8 @@ RSpec.describe Protocol::HPACK::Context do
 	context '#decode' do
 		it "raises an error if the command is invalid" do
 			expect do
-				context.decode(name: 0, value: 'test', type: :invalid)
+				header = [:invalid, 0, 'test']
+				context.decode(*header)
 			end.to raise_error(Protocol::HPACK::Error)
 		end
 	end
@@ -50,7 +51,8 @@ RSpec.describe Protocol::HPACK::Context do
 				it 'should process indexed header with literal value' do
 					original_table = context.table.dup
 
-					emit = context.decode(name: 4, value: '/path', type: type)
+                                        header = [type, 4, '/path']
+					emit = context.decode(*header)
 					expect(emit).to eq [':path', '/path']
 					expect(context.table).to eq original_table
 				end
@@ -58,7 +60,8 @@ RSpec.describe Protocol::HPACK::Context do
 				it 'should process literal header with literal value' do
 					original_table = context.table.dup
 
-					emit = context.decode(name: 'x-custom', value: 'random', type: type)
+                                        header = [type, 'x-custom', 'random']
+					emit = context.decode(*header)
 					expect(emit).to eq ['x-custom', 'random']
 					expect(context.table).to eq original_table
 				end
@@ -69,7 +72,8 @@ RSpec.describe Protocol::HPACK::Context do
 			it 'should process indexed header with literal value' do
 				original_table = context.table.dup
 
-				emit = context.decode(name: 4, value: '/path', type: :incremental)
+                                header = [:incremental, 4, '/path']
+				emit = context.decode(*header)
 				expect(emit).to eq [':path', '/path']
 				expect(context.table - original_table).to eq [[':path', '/path']]
 			end
@@ -77,7 +81,8 @@ RSpec.describe Protocol::HPACK::Context do
 			it 'should process literal header with literal value' do
 				original_table = context.table.dup
 
-				context.decode(name: 'x-custom', value: 'random', type: :incremental)
+                                header = [:incremental, 'x-custom', 'random']
+				context.decode(*header)
 				expect(context.table - original_table).to eq [['x-custom', 'random']]
 			end
 		end
@@ -92,11 +97,8 @@ RSpec.describe Protocol::HPACK::Context do
 				original_table = context.table.dup
 				original_size = original_table.join.bytesize + original_table.size * 32
 
-				context.decode(
-					name: 'x-custom',
-					value: 'a' * (2048 - original_size),
-					type: :incremental
-				)
+                                header = [:incremental, 'x-custom', 'a' * (2048 - original_size)]
+				context.decode(*header)
 
 				expect(context.table.first[0]).to eq 'x-custom'
 				expect(context.table.size).to eq original_table.size # number of entries
@@ -109,11 +111,11 @@ RSpec.describe Protocol::HPACK::Context do
 				add_to_table(['test2', '2' * 500])
 			end
 
-			h = {name: 'x-custom', value: 'a', index: 0, type: :incremental}
-			e = {name: 'large', value: 'a' * 2048, index: 0}
+			h = [:incremental, 'x-custom', 'a']
+                        e = [:incremental, 'large', 'a' * 2048]
 
-			context.decode(h)
-			context.decode(e.merge(type: :incremental))
+			context.decode(*h)
+			context.decode(*e)
 			expect(context.table).to be_empty
 		end
 
@@ -123,7 +125,8 @@ RSpec.describe Protocol::HPACK::Context do
 				add_to_table(['test2', '2' * 500])
 			end
 
-			context.decode(type: :change_table_size, value: 1500)
+                        header = [:change_table_size, nil, 1500]
+			context.decode(*header)
 			expect(context.table.size).to be 1
 			expect(context.table.first[0]).to eq 'test2'
 		end
