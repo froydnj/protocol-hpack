@@ -205,21 +205,20 @@ module Protocol
 			#
 			# @param headers [Array] +[[name, value], ...]+
 			# @return [Array] array of commands
-			def encode(headers)
-				commands = []
-				
+			def encode(headers, &blk)
 				# Literals commands are marked with :no_index when index is not used
 				no_index = [:static, :never].include?(@index)
 				
 				headers.each do |field, value|
-					command = add_command(field, value)
-					command[0] = :no_index if no_index && command[0] == :incremental
-					commands << command
+					type, name, value = add_command(field, value)
+					type = :no_index if no_index && type == :incremental
 					
-					decode(*command)
+          if type != :indexed
+					  decode(type, name, value)
+          end
+
+          yield type, name, value
 				end
-				
-				return commands
 			end
 
 			# Emits command for a header.

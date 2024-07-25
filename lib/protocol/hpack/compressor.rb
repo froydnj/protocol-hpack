@@ -175,14 +175,12 @@ module Protocol
 			def encode(headers, table_size = @table_size_limit)
 				if table_size and table_size != @context.table_size
 					command = @context.change_table_size(table_size)
-					
+
 					write_header(*command)
 				end
 				
-				commands = @context.encode(headers)
-				
-				commands.each do |command|
-					write_header(*command)
+				@context.encode(headers) do |type, name, value|
+					write_header(type, name, value)
 				end
 				
 				return @buffer
